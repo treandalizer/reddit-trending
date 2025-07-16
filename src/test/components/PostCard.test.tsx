@@ -26,18 +26,19 @@ describe('PostCard', () => {
   it('displays author and subreddit information', () => {
     render(<PostCard post={mockPost} index={0} />);
     expect(screen.getByText(/testuser/)).toBeInTheDocument();
-    expect(screen.getByText(/r\/programming/)).toBeInTheDocument();
+    expect(screen.getByText('r/')).toBeInTheDocument();
+    expect(screen.getByText('programming')).toBeInTheDocument();
   });
 
   it('shows upvotes and comments count', () => {
     render(<PostCard post={mockPost} index={0} />);
     expect(screen.getByText('1.5k')).toBeInTheDocument();
-    expect(screen.getByText('120')).toBeInTheDocument();
+    expect(screen.getByText('120 comments')).toBeInTheDocument();
   });
 
   it('displays correct ranking badge', () => {
     render(<PostCard post={mockPost} index={0} />);
-    expect(screen.getByText('#1')).toBeInTheDocument();
+    expect(screen.getByText('1.')).toBeInTheDocument();
   });
 
   it('has correct permalink', () => {
