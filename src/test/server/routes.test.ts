@@ -13,6 +13,10 @@ vi.mock('../../../server/storage', () => ({
     clearOldPosts: vi.fn(),
     getTopicPosts: vi.fn(),
     saveTopicPosts: vi.fn(),
+    clearTopicPosts: vi.fn(),
+    getUser: vi.fn(),
+    getUserByUsername: vi.fn(),
+    createUser: vi.fn(),
   },
 }));
 
@@ -26,6 +30,8 @@ describe('API Routes', () => {
     
     // Reset mocks
     vi.clearAllMocks();
+    // Reset fetch mock
+    vi.resetAllMocks();
   });
 
   describe('GET /api/trending', () => {
@@ -41,7 +47,7 @@ describe('API Routes', () => {
           numComments: 50,
           permalink: 'https://reddit.com/test',
           createdUtc: 1640995200,
-          fetchedAt: new Date(),
+          fetchedAt: '2025-07-16T10:39:40.736Z', // Use string instead of Date object
         },
       ];
 
@@ -56,6 +62,11 @@ describe('API Routes', () => {
 
     it('returns 500 when no cached data and Reddit API fails', async () => {
       vi.mocked(storage.getTrendingPosts).mockResolvedValue([]);
+      vi.mocked(storage.saveTrendingPosts).mockResolvedValue();
+      vi.mocked(storage.clearOldPosts).mockResolvedValue();
+
+      // Mock fetch to simulate Reddit API failure
+      global.fetch = vi.fn().mockRejectedValue(new Error('API Error'));
 
       const response = await request(app).get('/api/trending');
 
@@ -68,6 +79,10 @@ describe('API Routes', () => {
   describe('POST /api/trending/refresh', () => {
     it('returns 500 when Reddit API is unavailable', async () => {
       vi.mocked(storage.clearOldPosts).mockResolvedValue();
+      vi.mocked(storage.saveTrendingPosts).mockResolvedValue();
+
+      // Mock fetch to simulate Reddit API failure
+      global.fetch = vi.fn().mockRejectedValue(new Error('API Error'));
 
       const response = await request(app).post('/api/trending/refresh');
 
@@ -99,7 +114,7 @@ describe('API Routes', () => {
           numComments: 100,
           permalink: 'https://reddit.com/technology',
           createdUtc: 1640995200,
-          fetchedAt: new Date(),
+          fetchedAt: '2025-07-16T10:39:40.736Z', // Use string instead of Date object
         },
       ];
 
@@ -120,6 +135,11 @@ describe('API Routes', () => {
 
     it('returns 500 when no cached data and Reddit API fails', async () => {
       vi.mocked(storage.getTopicPosts).mockResolvedValue([]);
+      vi.mocked(storage.saveTopicPosts).mockResolvedValue();
+      vi.mocked(storage.clearTopicPosts).mockResolvedValue();
+
+      // Mock fetch to simulate Reddit API failure
+      global.fetch = vi.fn().mockRejectedValue(new Error('API Error'));
 
       const response = await request(app)
         .post('/api/search')
