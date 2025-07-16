@@ -225,16 +225,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error) {
       console.error('Error searching posts:', error);
-      
-      // Handle validation errors
-      if (error.name === 'ZodError') {
-        return res.status(400).json({ 
-          message: 'Invalid search parameters. Please check your input and try again.' 
+
+      if (error instanceof Error && error.name === 'ZodError') {
+        return res.status(400).json({
+          message: 'Invalid search parameters. Please check your input and try again.'
         });
       }
-      
-      res.status(500).json({ 
-        message: error.message || 'Failed to search posts. Please try again later.' 
+
+      if (error instanceof Error) {
+        return res.status(500).json({
+          message: error.message || 'Failed to search posts. Please try again later.'
+        });
+      }
+
+      // Fallback if it's not an instance of Error
+      res.status(500).json({
+        message: 'Failed to search posts. Please try again later.'
       });
     }
   });
