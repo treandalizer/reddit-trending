@@ -36,6 +36,7 @@ export interface RedditApiResponse {
         num_comments: number;
         permalink: string;
         created_utc: number;
+        selftext?: string; // Optional text content of the post
       };
     }>;
   };
