@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, AlertCircle, ExternalLink, TrendingUp, Search } from "lucide-react";
+import { RefreshCw, AlertCircle, ExternalLink, TrendingUp, Search, ArrowUp, ArrowDown, MessageSquare, Share } from "lucide-react";
 import { SiReddit } from "react-icons/si";
 import { PostCard } from "@/components/post-card";
 import { LoadingSkeleton } from "@/components/loading-skeleton";
@@ -17,6 +17,9 @@ export default function Home() {
   const [searchResults, setSearchResults] = useState<RedditPost[]>([]);
   const [currentSearch, setCurrentSearch] = useState<SearchRequest | null>(null);
   const [activeTab, setActiveTab] = useState<string>("trending");
+  const [analysisStates, setAnalysisStates] = useState<
+    { analyzing: boolean; result: { painPoints: string[] } | null }[]
+  >([]);
 
   const { data: posts, isLoading, error } = useQuery<RedditPost[]>({
     queryKey: ["/api/trending"],
@@ -83,6 +86,30 @@ export default function Home() {
       }
     }
     return new Date().toLocaleTimeString();
+  };
+
+  // Helper to handle analysis for a post
+  const handleAnalyze = async (permalink: string, index: number) => {
+    setAnalysisStates((prev) => {
+      const next = [...prev];
+      next[index] = { analyzing: true, result: null };
+      return next;
+    });
+    try {
+      const response = await apiRequest("POST", "/api/analyze", { permalink });
+      const data = await response.json();
+      setAnalysisStates((prev) => {
+        const next = [...prev];
+        next[index] = { analyzing: false, result: data };
+        return next;
+      });
+    } catch (error) {
+      setAnalysisStates((prev) => {
+        const next = [...prev];
+        next[index] = { analyzing: false, result: { painPoints: ["Error analyzing"] } };
+        return next;
+      });
+    }
   };
 
   return (
@@ -156,7 +183,14 @@ export default function Home() {
             {posts && posts.length > 0 && (
               <div className="space-y-4">
                 {posts.map((post, index) => (
-                  <PostCard key={post.redditId} post={post} index={index} />
+                  <PostCard
+                    key={post.redditId}
+                    post={post}
+                    index={index}
+                    onAnalyze={handleAnalyze}
+                    analyzing={!!analysisStates[index]?.analyzing}
+                    analysisResult={analysisStates[index]?.result}
+                  />
                 ))}
               </div>
             )}

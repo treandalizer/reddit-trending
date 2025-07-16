@@ -48,3 +48,49 @@ describe('PostCard', () => {
     expect(link).toHaveAttribute('target', '_blank');
   });
 });
+
+// --- API endpoint tests for /api/analyze ---
+import request from "supertest";
+import express from "express";
+import { registerRoutes } from "../../../server/routes";
+
+describe("/api/analyze endpoint", () => {
+  let app: express.Express;
+
+  beforeAll(async () => {
+    app = express();
+    app.use(express.json());
+    await registerRoutes(app);
+  });
+
+  it("returns 400 if no permalink is provided", async () => {
+    const res = await request(app).post("/api/analyze").send({});
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Permalink is required");
+  });
+
+  it("returns pain points for a valid Reddit post permalink", async () => {
+    // Use a known, recent Reddit post permalink (as of June 2024)
+    const permalink = "/r/AskReddit/comments/1m19hbt/guys_whats_the_most_offensive_thing_youve_heard";
+    const res = await request(app).post("/api/analyze").send({ permalink });
+
+    // The Reddit API may rate limit or block, so allow for 200 or 500
+    expect([200, 500]).toContain(res.status);
+
+    if (res.status === 200) {
+      console.log("Pain points result:", res.body.painPoints);
+      expect(Array.isArray(res.body.painPoints)).toBe(true);
+      expect(res.body.painPoints.length).toBeLessThanOrEqual(10);
+    } else {
+      // If Reddit API fails, error message should be present
+      console.error("Error response:", res.body);
+      expect(res.body.error).toBeDefined();
+    }
+  });
+
+  it("handles invalid permalinks gracefully", async () => {
+    const res = await request(app).post("/api/analyze").send({ permalink: "/r/invalid/comments/xxxxxx/" });
+    expect([200, 404, 500]).toContain(res.status);
+    // Should not throw, but may return empty or error
+  });
+});

@@ -245,6 +245,214 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Analyze comments for a given Reddit post (by permalink)
+  app.post("/api/analyze", async (req, res) => {
+    try {
+      const { permalink } = req.body;
+      console.log(`Received request to analyze comments for permalink: ${permalink}`);
+      if (!permalink) {
+        return res.status(400).json({ error: "Permalink is required" });
+      }
+
+      // Fetch comments for the post
+      // Reddit API: https://www.reddit.com{permalink}.json
+      const url = `${permalink}.json?limit=100`;
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'TrendingRedditApp/1.0 (by /u/developer)',
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Reddit API returned ${response.status}: ${response.statusText}`);
+      }
+
+      const data: any = await response.json();
+      // Comments are in data[1].data.children
+      const rawComments = (data[1]?.data?.children || [])
+          .filter((child: any) => child.kind === "t1")
+          .map((child: any) => child.data.body)
+          .filter((comment: string) => comment && comment.length > 15);
+
+      console.log(`Fetched ${rawComments.length} comments for permalink: ${permalink}`);
+      // Sentiment Analysis Helper Functions
+      const sentimentWords = {
+        positive: [
+          'amazing', 'awesome', 'excellent', 'fantastic', 'great', 'love', 'perfect',
+          'wonderful', 'brilliant', 'outstanding', 'good', 'nice', 'happy', 'satisfied',
+          'pleased', 'impressed', 'recommend', 'helpful', 'useful', 'easy', 'smooth',
+          'fast', 'efficient', 'reliable', 'quality', 'best', 'favorite', 'solid'
+        ],
+        negative: [
+          'terrible', 'awful', 'horrible', 'worst', 'hate', 'disgusting', 'pathetic',
+          'useless', 'broken', 'failed', 'disappointed', 'frustrated', 'annoying',
+          'confusing', 'difficult', 'slow', 'expensive', 'overpriced', 'waste',
+          'regret', 'avoid', 'warning', 'scam', 'fraud', 'misleading', 'fake',
+          'poor', 'cheap', 'flimsy', 'unreliable', 'buggy', 'glitchy'
+        ]
+      };
+
+      const painPointKeywords = [
+        'problem', 'issue', 'bug', 'error', 'crash', 'freeze', 'lag', 'slow',
+        'expensive', 'overpriced', 'confusing', 'difficult', 'complicated',
+        'frustrating', 'annoying', 'disappointing', 'broken', 'doesn\'t work',
+        'not working', 'failed', 'missing', 'lacking', 'need', 'wish', 'should',
+        'could be better', 'improvement', 'fix', 'update', 'change', 'remove',
+        'add', 'feature request', 'suggestion', 'complaint', 'concern', 'worry'
+      ];
+
+      // Sentiment Analysis Function
+      function analyzeSentiment(text: string): { score: number; sentiment: 'positive' | 'negative' | 'neutral' } {
+        const words = text.toLowerCase().split(/\s+/);
+        let score = 0;
+
+        // Count positive and negative words
+        for (const word of words) {
+          if (sentimentWords.positive.includes(word)) score += 1;
+          if (sentimentWords.negative.includes(word)) score -= 1;
+        }
+
+        // Apply negation handling (simple approach)
+        const negationWords = ['not', 'no', 'never', 'none', 'nothing', 'nobody', 'nowhere', 'neither', 'nor', 'don\'t', 'doesn\'t', 'didn\'t', 'won\'t', 'wouldn\'t', 'can\'t', 'cannot', 'shouldn\'t', 'mustn\'t'];
+        for (let i = 0; i < words.length - 1; i++) {
+          if (negationWords.includes(words[i])) {
+            // Flip sentiment of next few words
+            for (let j = i + 1; j < Math.min(i + 4, words.length); j++) {
+              if (sentimentWords.positive.includes(words[j])) score -= 2; // was +1, now -1
+              if (sentimentWords.negative.includes(words[j])) score += 2; // was -1, now +1
+            }
+          }
+        }
+
+        // Normalize score based on text length
+        const normalizedScore = score / Math.max(words.length / 10, 1);
+
+        let sentiment: 'positive' | 'negative' | 'neutral' = 'neutral';
+        if (normalizedScore > 0.1) sentiment = 'positive';
+        else if (normalizedScore < -0.1) sentiment = 'negative';
+
+        return { score: normalizedScore, sentiment };
+      }
+
+      // Pain Point Detection Function
+      function detectPainPoints(text: string): { isPainPoint: boolean; keywords: string[]; severity: number } {
+        const lowerText = text.toLowerCase();
+        const foundKeywords: string[] = [];
+        let severity = 0;
+
+        for (const keyword of painPointKeywords) {
+          if (lowerText.includes(keyword)) {
+            foundKeywords.push(keyword);
+            // Weight certain keywords more heavily
+            if (['broken', 'crash', 'error', 'bug', 'terrible', 'awful'].includes(keyword)) {
+              severity += 2;
+            } else {
+              severity += 1;
+            }
+          }
+        }
+
+        return {
+          isPainPoint: foundKeywords.length > 0,
+          keywords: foundKeywords,
+          severity
+        };
+      }
+
+      // Analyze all comments
+      const analyzedComments = rawComments.map((comment: string) => {
+        const sentiment = analyzeSentiment(comment);
+        const painPoint = detectPainPoints(comment);
+
+        return {
+          text: comment,
+          sentiment: sentiment.sentiment,
+          sentimentScore: sentiment.score,
+          isPainPoint: painPoint.isPainPoint,
+          painPointKeywords: painPoint.keywords,
+          painPointSeverity: painPoint.severity,
+          length: comment.length
+        };
+      });
+
+      // Extract pain points (comments with negative sentiment or pain point keywords)
+      const painPointComments = analyzedComments
+          .filter(comment =>
+              comment.sentiment === 'negative' ||
+              comment.isPainPoint ||
+              comment.sentimentScore < -0.05
+          )
+          .sort((a, b) => {
+            // Sort by pain point severity, then by negative sentiment score
+            if (a.painPointSeverity !== b.painPointSeverity) {
+              return b.painPointSeverity - a.painPointSeverity;
+            }
+            return a.sentimentScore - b.sentimentScore;
+          });
+
+      // Generate summary insights
+      const totalComments = analyzedComments.length;
+      const sentimentBreakdown = {
+        positive: analyzedComments.filter(c => c.sentiment === 'positive').length,
+        negative: analyzedComments.filter(c => c.sentiment === 'negative').length,
+        neutral: analyzedComments.filter(c => c.sentiment === 'neutral').length
+      };
+
+      // Extract top pain point themes
+      const painPointThemes: Record<string, number> = {};
+      painPointComments.forEach(comment => {
+        comment.painPointKeywords.forEach(keyword => {
+          painPointThemes[keyword] = (painPointThemes[keyword] || 0) + 1;
+        });
+      });
+
+      const topPainPointThemes = Object.entries(painPointThemes)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([keyword, count]) => ({ keyword, count }));
+
+      // Calculate average sentiment score
+      const avgSentimentScore = analyzedComments.reduce((sum, comment) => sum + comment.sentimentScore, 0) / totalComments;
+
+      // Prepare response
+      const response_data = {
+        summary: {
+          totalComments,
+          sentimentBreakdown,
+          sentimentPercentages: {
+            positive: Math.round((sentimentBreakdown.positive / totalComments) * 100),
+            negative: Math.round((sentimentBreakdown.negative / totalComments) * 100),
+            neutral: Math.round((sentimentBreakdown.neutral / totalComments) * 100)
+          },
+          averageSentimentScore: Math.round(avgSentimentScore * 1000) / 1000,
+          overallSentiment: avgSentimentScore > 0.1 ? 'positive' : avgSentimentScore < -0.1 ? 'negative' : 'neutral'
+        },
+        painPoints: painPointComments.slice(0, 20).map(comment => ({
+          text: comment.text.substring(0, 200) + (comment.text.length > 200 ? '...' : ''),
+          sentiment: comment.sentiment,
+          sentimentScore: Math.round(comment.sentimentScore * 1000) / 1000,
+          painPointKeywords: comment.painPointKeywords,
+          severity: comment.painPointSeverity
+        })),
+        topPainPointThemes,
+        insights: {
+          mostCommonPainPoint: topPainPointThemes[0]?.keyword || 'None detected',
+          painPointPercentage: Math.round((painPointComments.length / totalComments) * 100),
+          recommendedAction: avgSentimentScore < -0.2 ? 'Immediate attention needed' :
+              avgSentimentScore < 0 ? 'Monitor closely' : 'Generally positive feedback'
+        }
+      };
+
+      console.log('Pain Points Inferred...', response_data);
+      res.json(response_data);
+    } catch (error: any) {
+      console.error('Error analyzing post comments:', error);
+      res.status(500).json({ error: "Failed to analyze post comments", details: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
