@@ -126,8 +126,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = searchRequestSchema.parse(req.body);
       const { topic, sortBy, timeFilter } = validatedData;
       
-      // Check for cached topic posts
-      const cachedPosts = await storage.getTopicPosts(topic);
+      // Create cache key that includes all search parameters
+      const cacheKey = `${topic}:${sortBy}:${timeFilter}`;
+      
+      // Check for cached topic posts with the specific search parameters
+      const cachedPosts = await storage.getTopicPosts(cacheKey);
       
       // If we have recent posts (less than 5 minutes old), return them
       if (cachedPosts.length > 0) {
@@ -170,11 +173,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             createdUtc: child.data.created_utc,
           }));
           
-          // Save to storage
-          await storage.saveTopicPosts(topic, posts);
+          // Save to storage with the cache key
+          await storage.saveTopicPosts(cacheKey, posts);
           
           // Return the saved posts
-          const savedPosts = await storage.getTopicPosts(topic);
+          const savedPosts = await storage.getTopicPosts(cacheKey);
           return res.json(savedPosts);
         }
       } catch (apiError) {
