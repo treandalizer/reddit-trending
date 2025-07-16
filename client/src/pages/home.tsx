@@ -228,7 +228,7 @@ export default function Home() {
           <p className="text-reddit-gray text-xs mt-2">
             Powered by Reddit API • 
             <a 
-              href="https://github.com" 
+              href="https://github.com/treandalizer/reddit-trending" 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-reddit hover:text-orange-600 ml-1"
