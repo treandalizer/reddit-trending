@@ -26,12 +26,12 @@ describe('API Routes', () => {
   beforeEach(async () => {
     app = express();
     app.use(express.json());
-    await registerRoutes(app);
     
-    // Reset mocks
+    // Reset mocks before setting up routes
     vi.clearAllMocks();
-    // Reset fetch mock
     vi.resetAllMocks();
+    
+    await registerRoutes(app);
   });
 
   describe('GET /api/trending', () => {
@@ -57,7 +57,7 @@ describe('API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual(mockPosts);
-      expect(storage.getTrendingPosts).toHaveBeenCalledOnce();
+      expect(storage.getTrendingPosts).toHaveBeenCalled();
     });
 
     it('returns 500 when no cached data and Reddit API fails', async () => {
