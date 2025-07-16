@@ -142,14 +142,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Build Reddit search URL
-      let searchUrl = `https://www.reddit.com/search.json?q=${encodeURIComponent(topic)}&sort=${sortBy}&limit=10`;
-      if (timeFilter !== 'all') {
-        searchUrl += `&t=${timeFilter}`;
+      // Build Reddit search URL - use specific search parameters for better results
+      let searchUrl;
+      
+      // If the topic starts with 'r/', search within that subreddit
+      if (topic.toLowerCase().startsWith('r/')) {
+        const subreddit = topic.substring(2);
+        searchUrl = `https://www.reddit.com/r/${subreddit}/${sortBy}.json?limit=10`;
+        if (timeFilter !== 'all') {
+          searchUrl += `&t=${timeFilter}`;
+        }
+      } else {
+        // General search with better query construction
+        searchUrl = `https://www.reddit.com/search.json?q=${encodeURIComponent(topic)}&sort=${sortBy}&limit=10&type=link`;
+        if (timeFilter !== 'all') {
+          searchUrl += `&t=${timeFilter}`;
+        }
       }
       
       // Try to fetch from Reddit API
       try {
+        console.log(`Searching Reddit with URL: ${searchUrl}`);
         const response = await fetch(searchUrl, {
           headers: {
             'User-Agent': 'TrendingRedditApp/1.0 (by /u/developer)',
@@ -161,17 +174,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (response.ok) {
           const data: RedditApiResponse = await response.json();
           
-          // Transform the data
-          const posts = data.data.children.map(child => ({
-            redditId: child.data.id,
-            title: child.data.title,
-            author: child.data.author,
-            subreddit: child.data.subreddit,
-            upvotes: child.data.ups,
-            numComments: child.data.num_comments,
-            permalink: `https://reddit.com${child.data.permalink}`,
-            createdUtc: child.data.created_utc,
-          }));
+          // Transform the data and filter out irrelevant results
+          const posts = data.data.children
+            .filter(child => {
+              // Filter out posts that are not relevant to the search topic
+              const title = child.data.title.toLowerCase();
+              const searchTopic = topic.toLowerCase();
+              
+              // If searching for a specific subreddit, don't filter by title
+              if (topic.toLowerCase().startsWith('r/')) {
+                return true;
+              }
+              
+              // For general searches, check if the title or subreddit contains the search term
+              return title.includes(searchTopic) || 
+                     child.data.subreddit.toLowerCase().includes(searchTopic) ||
+                     child.data.selftext?.toLowerCase().includes(searchTopic);
+            })
+            .map(child => ({
+              redditId: child.data.id,
+              title: child.data.title,
+              author: child.data.author,
+              subreddit: child.data.subreddit,
+              upvotes: child.data.ups,
+              numComments: child.data.num_comments,
+              permalink: `https://reddit.com${child.data.permalink}`,
+              createdUtc: child.data.created_utc,
+            }));
+          
+          console.log(`Found ${posts.length} relevant posts for "${topic}"`);
           
           // Save to storage with the cache key
           await storage.saveTopicPosts(cacheKey, posts);
