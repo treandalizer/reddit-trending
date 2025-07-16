@@ -1,4 +1,4 @@
-# Reddit Explorer
+# reddit-trending
 
 A modern full-stack web application that displays trending Reddit posts and allows users to search for posts on specific topics. Built with React, TypeScript, Express, and Tailwind CSS.
 
@@ -43,7 +43,7 @@ Before running the application, ensure you have:
 
 2. **Navigate** to the project directory:
    ```bash
-   cd reddit-explorer
+   cd reddit-trending
    ```
 
 3. **Install dependencies**:
