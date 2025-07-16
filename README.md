@@ -1,5 +1,7 @@
 # reddit-trending
 
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/treandalizer/reddit-trending?utm_source=oss&utm_medium=github&utm_campaign=treandalizer%2Freddit-trending&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
 A modern full-stack web application that displays trending Reddit posts and allows users to search for posts on specific topics. Built with React, TypeScript, Express, and Tailwind CSS.
 
 ## Features
