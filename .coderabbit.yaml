@@ -1,0 +1,51 @@
+# .coderabbit.yaml
+
+version: 1
+
+review:
+  enable: true
+  reviewers:
+    - code
+    - tests
+    - readability
+    - security
+    - performance
+    - best_practices
+
+  rules:
+    - name: Avoid using any
+      pattern: '\bany\b'
+      message: "Avoid using 'any' type. Use unknown or a proper type instead."
+      level: warning
+
+    - name: Console.log usage
+      pattern: 'console\.log'
+      message: "Remove console.log before merging."
+      level: info
+
+  exclude:
+    paths:
+      - dist/**
+      - coverage/**
+      - node_modules/**
+      - .github/**
+      - tests/utils/**
+      - public/**
+      - "**/*.test.ts"
+    files:
+      - README.md
+
+  max_comments: 50
+
+pull_request:
+  approve_if_no_comments: true
+  comment_summary: true
+  comment_label: "🐰 CodeRabbit Review"
+
+ai:
+  model: gpt-4
+  temperature: 0.4
+  prompt_prefix: |
+    This project is a full-stack TypeScript app using Vite (frontend), Express (backend), and Vitest for testing.
+    Be constructive and concise. Offer actionable feedback.
+
