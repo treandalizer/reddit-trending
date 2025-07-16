@@ -4,8 +4,6 @@
 
 A modern full-stack web application that displays trending Reddit posts and allows users to search for posts on specific topics. Built with React, TypeScript, Express, and Tailwind CSS.
 
-Humanity is doomed in front of AI!
-
 ## Features
 
 - **Trending Posts**: View the top 10 trending posts from Reddit
