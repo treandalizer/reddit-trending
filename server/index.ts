@@ -1,71 +1,55 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express, { Request, Response, NextFunction } from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// ESM-compatible __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
+  let captured: any;
+  const originalJson = res.json;
+  res.json = function (body, ...args) {
+    captured = body;
+    return originalJson.apply(res, [body, ...args]);
   };
-
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
+    if (req.path.startsWith("/api")) {
+      let line = `${req.method} ${req.path} ${res.statusCode} in ${duration}ms`;
+      if (captured) line += ` :: ${JSON.stringify(captured)}`;
+      console.log(line);
     }
   });
-
   next();
 });
 
+// Register API routes
 (async () => {
-  const server = await registerRoutes(app);
+  await registerRoutes(app);
 
+  // Global error handler
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
+    res.status(status).json({ message: err.message || "Internal Server Error" });
+    console.error("Error:", err.message);
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+  // Serve built frontend — points to dist/public relative to dist/index.js
+  const distPath = path.join(__dirname, "public");
+  app.use(express.static(distPath));
+  app.use("*", (_req, res) => res.sendFile(path.join(distPath, "index.html")));
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = 5000;
-  const host =
-    process.env.NODE_ENV === "development"
-      ? "localhost"
-      : process.env.BIND_ADDRESS || "127.0.0.1";
-
-  server.listen(port, host, () => {
-    log(`serving on http://${host}:${port}`);
-});
+  const host = "0.0.0.0";
+  app.listen(port, host, () => {
+    console.log(`Serving on http://${host}:${port}`);
+  });
 })();

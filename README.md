@@ -53,6 +53,27 @@ Before running the application, ensure you have:
    npm install
    ```
 
+## Docker
+
+To build and run the application using Docker, follow these steps:
+
+1. **Build the Docker image**:
+   ```bash
+   docker build -t reddit-trending-app .
+   ```
+2. **Run the Docker container**:
+   ```bash
+    docker run -d -p 127.0.0.1:5000:5000 --name reddit-trending-app
+    ```
+   
+This will start the application in a Docker container and bind it to `localhost:5000`. You can access the app by 
+navigating to `http://localhost:5000` in your web browser.
+
+Note: If you are part of a VPN network and would like to make that endpoint only available to the machines that are part
+of that network replace 127.0.0.1 with the tailscale ip address of the machine where the container is running. 
+
+For example., you can find the tailscale ip address by running `tailscale ip -4` in the terminal.
+
 ## Configuration
 
 ### Environment Variables (Optional)
