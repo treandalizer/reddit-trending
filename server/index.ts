@@ -31,6 +31,7 @@ app.use((req, res, next) => {
   next();
 });
 
+
 // Register API routes
 (async () => {
   await registerRoutes(app);
