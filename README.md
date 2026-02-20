@@ -74,6 +74,16 @@ of that network replace 127.0.0.1 with the tailscale ip address of the machine w
 
 For example., you can find the tailscale ip address by running `tailscale ip -4` in the terminal.
 
+To run the image:
+
+1. Build the image locally `docker buildx build --no-cache --platform linux/amd64 -t reddit-trending-app .`
+2. Copy the image to the machine where you want to run the container `scp reddit-trending-app.tar user@remote-machine:/path/to/destination`
+3. Load the image on that machine using `docker load -i reddit-trending-app.tar`
+
+```bash
+sudo docker run -p 100.64.78.20:5000:5000 reddit-trending-app
+```
+
 ## Configuration
 
 ### Environment Variables (Optional)
